@@ -292,15 +292,33 @@ function esc(str){
 
 // ── audio (Web Audio API) ─────────────────────────────────────────────────────
 function getACtx(){ if(!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)(); return audioCtx; }
-// when = seconds offset from now (uses Web Audio scheduling — works on iOS/WeChat)
-function beep(freq,dur,vol,when){
+
+// ── iOS keep-alive: play a 1-sample silent buffer every 20s so iOS never suspends AudioContext
+var _kaTimer=null;
+function startKeepAlive(){
+  if(_kaTimer) return;
+  _kaTimer=setInterval(function(){
+    if(!audioCtx) return;
+    try{
+      if(audioCtx.state==='suspended'){ audioCtx.resume(); return; }
+      var buf=audioCtx.createBuffer(1,1,audioCtx.sampleRate);
+      var src=audioCtx.createBufferSource();
+      src.buffer=buf; src.connect(audioCtx.destination); src.start();
+    }catch(e){}
+  },20000);
+}
+function stopKeepAlive(){ clearInterval(_kaTimer); _kaTimer=null; }
+
+// when = seconds offset from now; async so we can await resume() on iOS Safari
+async function beep(freq,dur,vol,when){
   vol=vol||0.95; when=when||0;
   try{
-    const c=getACtx(); c.resume();
-    const o=c.createOscillator(), g=c.createGain();
+    var c=getACtx();
+    if(c.state!=='running') await c.resume();
+    var o=c.createOscillator(), g=c.createGain();
     o.connect(g); g.connect(c.destination);
     o.type='sine'; o.frequency.value=freq;
-    const t=c.currentTime+when;
+    var t=c.currentTime+when;
     g.gain.setValueAtTime(vol,t);
     g.gain.exponentialRampToValueAtTime(0.001,t+dur);
     o.start(t); o.stop(t+dur+0.05);
@@ -416,6 +434,7 @@ function tick(){ secs++; $clock.textContent=fmt(secs); checkMilestones(); }
 
 $startBtn.addEventListener('click',()=>{
   try{ getACtx().resume(); }catch(e){}
+  startKeepAlive();
   running=true;
   interval=setInterval(tick,1000);
   $startBtn.style.display='none';
@@ -436,6 +455,7 @@ $pauseBtn.addEventListener('click',()=>{
 
 $resetBtn.addEventListener('click',()=>{
   clearInterval(interval); running=false; secs=0; colorState='none';
+  stopKeepAlive();
   $clock.textContent='00:00';
   applyColor('none');
   $status.textContent='Select a segment and press START';
