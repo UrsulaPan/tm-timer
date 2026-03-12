@@ -413,12 +413,12 @@ function applyColor(state){
 
 function checkMilestones(){
   const seg=activeSeg();
-  if(!seg.green) return;
+  if(!seg.red && !seg.yellow && !seg.green) return; // truly no limits (SHARE/CUSTOM)
   let next='none';
-  if(secs>=seg.ring)   next='ring';
-  else if(secs>=seg.red)    next='red';
-  else if(secs>=seg.yellow) next='yellow';
-  else if(secs>=seg.green)  next='green';
+  if(seg.ring   && secs>=seg.ring)   next='ring';
+  else if(seg.red    && secs>=seg.red)    next='red';
+  else if(seg.yellow && secs>=seg.yellow) next='yellow';
+  else if(seg.green  && secs>=seg.green)  next='green';
   if(next!==colorState){
     colorState=next;
     applyColor(next);
