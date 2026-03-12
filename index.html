@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>TM Timer</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+    :root{
+      --bg:#0d0d0d;--surface:#1c1c1c;--surface2:#272727;
+      --text:#f0f0f0;--dim:#777;
+      --green:#27ae60;--yellow:#f1c40f;--red:#e74c3c;--blue:#2980b9;--purple:#8e44ad;
+      --r:14px;
+    }
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+      background:var(--bg);color:var(--text);min-height:100vh;
+      display:flex;flex-direction:column;transition:background .4s,color .3s;}
+
+    /* ── header ── */
+    .hdr{display:flex;justify-content:space-between;align-items:center;padding:14px 16px 0;}
+    .hdr h1{font-size:20px;font-weight:700;}
+    .wake-btn{font-size:12px;padding:6px 11px;border-radius:20px;
+      background:var(--surface2);color:var(--dim);border:1px solid #3a3a3a;cursor:pointer;}
+    .wake-btn.on{color:var(--yellow);border-color:var(--yellow);}
+    .new-mtg-btn{font-size:12px;padding:6px 11px;border-radius:20px;
+      background:rgba(231,76,60,.15);color:#e74c3c;border:1px solid rgba(231,76,60,.3);cursor:pointer;}
+
+    /* ── setup ── */
+    .setup{padding:12px 16px;display:flex;flex-direction:column;gap:10px;}
+    select,input[type=text],input[type=number]{width:100%;padding:14px 12px;font-size:15px;
+      border-radius:var(--r);border:1px solid #333;background:var(--surface);color:var(--text);}
+    input[type=number]{-moz-appearance:textfield;}
+    input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
+    select{-webkit-appearance:none;appearance:none;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23777' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+      background-repeat:no-repeat;background-position:right 14px center;padding-right:36px;}
+
+    /* ── milestones bar ── */
+    .ms-bar{display:flex;justify-content:center;gap:6px;padding:4px 16px;flex-wrap:wrap;}
+    .ms{padding:4px 10px;border-radius:20px;font-size:12px;font-variant-numeric:tabular-nums;
+      background:var(--surface);}
+    .ms-g{color:var(--green);}.ms-y{color:var(--yellow);}.ms-r{color:var(--red);}
+    .ms-ring{color:var(--purple);}
+
+    /* ── custom time inputs ── */
+    .custom-row{display:none;}
+    .custom-field label.lbl-y{color:var(--yellow);}
+    .custom-field label.lbl-r{color:var(--red);}
+    .custom-field input{padding:10px 8px;font-size:15px;font-variant-numeric:tabular-nums;
+      border-radius:10px;border:1px solid #333;background:var(--surface);color:var(--text);
+      text-align:center;width:100%;}
+
+    /* ── timer face ── */
+    .face{flex:1;display:flex;flex-direction:column;align-items:center;
+      justify-content:center;padding:8px 0;min-height:160px;}
+    .clock{font-size:100px;font-weight:800;font-variant-numeric:tabular-nums;
+      letter-spacing:-3px;line-height:1;transition:color .3s;}
+    .status{font-size:14px;color:var(--dim);margin-top:8px;height:22px;text-align:center;}
+
+    /* color states */
+    body.s-green{background:#0d2b1a;}.s-green .clock{color:var(--green);}
+    body.s-yellow{background:#2b2500;}.s-yellow .clock{color:var(--yellow);}
+    body.s-red{background:#2b0d0d;}.s-red .clock{color:var(--red);}
+    body.s-ring{background:#4a0000;animation:flashbg 1s infinite;}
+    .s-ring .clock{color:#ff5555;}
+    @keyframes flashbg{0%,100%{background:#4a0000;}50%{background:#6a0000;}}
+
+    /* ── buttons ── */
+    .btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px 16px;}
+    .btn{padding:18px;font-size:17px;font-weight:700;border:none;border-radius:var(--r);
+      cursor:pointer;color:#fff;transition:opacity .15s,transform .1s;}
+    .btn:active{opacity:.75;transform:scale(.97);}
+    .btn-start{grid-column:1/-1;font-size:20px;padding:22px;background:var(--blue);}
+    .btn-pause{background:#e67e22;}
+    .btn-save{background:var(--green);}
+    .btn-reset{background:#555;}
+    .btn-bell{grid-column:1/-1;background:var(--purple);}
+
+    /* ── records ── */
+    .records{background:var(--surface);border-top:1px solid #222;padding:14px 16px;}
+    .rec-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+    .rec-hdr h3{font-size:16px;}
+    .btn-report{font-size:13px;padding:7px 14px;border-radius:20px;
+      background:var(--blue);color:#fff;border:none;cursor:pointer;}
+    .rec-item{padding:10px 0;border-bottom:1px solid #222;font-size:14px;
+      display:flex;justify-content:space-between;align-items:center;gap:8px;}
+    .rec-item:last-child{border-bottom:none;}
+    .rec-left{flex:1;}
+    .rec-right{display:flex;align-items:center;gap:8px;}
+    .tag{padding:2px 8px;border-radius:10px;font-size:12px;font-weight:600;}
+    .ok{background:rgba(39,174,96,.2);color:var(--green);}
+    .over{background:rgba(231,76,60,.2);color:var(--red);}
+    .under{background:rgba(241,196,15,.2);color:var(--yellow);}
+    .noted{background:rgba(255,255,255,.08);color:var(--dim);}
+    .del-btn{background:none;border:none;color:#444;font-size:17px;cursor:pointer;padding:4px;}
+    .empty{text-align:center;color:var(--dim);padding:20px;font-size:14px;}
+    .clr-btn{background:none;border:none;color:var(--dim);font-size:12px;
+      cursor:pointer;display:block;margin-top:8px;margin-left:auto;}
+
+    /* ── fullscreen card overlay ── */
+    #card{display:none;position:fixed;inset:0;z-index:900;
+      flex-direction:column;align-items:center;justify-content:center;cursor:pointer;}
+    .card-green{background:var(--green)!important;}
+    .card-yellow{background:var(--yellow)!important;}
+    .card-red{background:var(--red)!important;}
+    .card-ring{background:#cc0000!important;animation:flashbg 0.6s infinite;}
+    .card-icon{font-size:100px;}
+    .card-word{font-size:42px;font-weight:800;color:rgba(0,0,0,.65);margin-top:12px;}
+    .card-sub{font-size:16px;color:rgba(0,0,0,.45);margin-top:24px;}
+
+    /* ── report modal ── */
+    #modal{display:none;position:fixed;inset:0;z-index:1000;
+      background:rgba(0,0,0,.88);flex-direction:column;align-items:center;
+      justify-content:flex-start;padding:20px;overflow-y:auto;}
+    .modal-box{background:var(--surface);border-radius:var(--r);
+      padding:20px;width:100%;max-width:500px;margin:20px auto;}
+    .modal-box h2{margin-bottom:12px;}
+    .report-txt{background:#111;padding:14px;border-radius:8px;
+      font-family:monospace;font-size:13px;white-space:pre-wrap;
+      max-height:52vh;overflow-y:auto;}
+    .modal-btns{display:flex;gap:10px;margin-top:14px;}
+    .modal-btns button{flex:1;padding:14px;border-radius:var(--r);
+      border:none;font-size:15px;font-weight:600;cursor:pointer;}
+  </style>
+</head>
+<body>
+
+<!-- ── main view ── -->
+<div id="main">
+
+  <div class="hdr">
+    <h1>🎤 TM Timer</h1>
+    <div style="display:flex;gap:8px;">
+      <button class="new-mtg-btn" id="newMtgBtn">🔄 New Meeting</button>
+      <button class="wake-btn" id="wakeBtn">💡 Keep Awake</button>
+    </div>
+  </div>
+
+  <div class="setup">
+    <select id="seg">
+      <optgroup label="🏆 Competitive Speeches">
+        <option value="TT">Table Topics (1–2 min)</option>
+        <option value="PS57">Prepared Speech (5–7 min)</option>
+        <option value="PS46">Prepared Speech (4–6 min)</option>
+        <option value="EVAL">Evaluation (2–3 min)</option>
+      </optgroup>
+      <optgroup label="📋 GE Team — Introductions">
+        <option value="GE_INTRO">Evaluation Intro (1 min)</option>
+        <option value="TIMER_INTRO">Timer Intro (3 min)</option>
+        <option value="AH_INTRO">Ah-Counter Intro (3 min)</option>
+        <option value="GRAM_INTRO">Grammarian Intro (3 min)</option>
+      </optgroup>
+      <optgroup label="📊 GE Team — Reports">
+        <option value="TIMER_REP">Timer Report (2–3 min)</option>
+        <option value="AH_REP">Ah-Counter Report (2 min)</option>
+        <option value="GRAM_REP">Grammarian Report (3 min)</option>
+        <option value="GE_REP">General Evaluation (6–8 min)</option>
+      </optgroup>
+      <optgroup label="🎙️ Other">
+        <option value="GUEST">Guest Talk (5 min)</option>
+        <option value="SHARE">Sharing (no limit)</option>
+        <option value="CUSTOM">Custom / Special ✏️</option>
+      </optgroup>
+    </select>
+    <input type="text" id="speaker" placeholder="Speaker / Role name (optional)">
+    <div style="display:flex;gap:10px;align-items:center;">
+      <input type="number" id="customRed" placeholder="Custom max time (min), e.g. 7" min="0.5" step="0.5" style="flex:1;">
+      <span style="color:var(--dim);font-size:12px;white-space:nowrap;">🔴 override</span>
+    </div>
+  </div>
+
+  <div class="ms-bar">
+    <span class="ms ms-g" id="ms-g">🟢 –</span>
+    <span class="ms ms-y" id="ms-y">🟡 –</span>
+    <span class="ms ms-r" id="ms-r">🔴 –</span>
+    <span class="ms ms-ring" id="ms-ring">🔔 –</span>
+  </div>
+
+  <div class="face">
+    <div class="clock" id="clock">00:00</div>
+    <div class="status" id="status">Select a segment and press START</div>
+  </div>
+
+  <div class="btns" id="btns">
+    <button class="btn btn-start" id="startBtn">▶ START</button>
+    <button class="btn btn-pause" id="pauseBtn" style="display:none">⏸ PAUSE</button>
+    <button class="btn btn-save"  id="saveBtn"  style="display:none">✔ SAVE</button>
+    <button class="btn btn-reset" id="resetBtn">↺ RESET</button>
+    <button class="btn btn-bell"  id="bellBtn"  style="display:none">🔔 Ring Bell (Manual)</button>
+  </div>
+
+  <div class="records">
+    <div class="rec-hdr">
+      <h3>Session Records</h3>
+      <button class="btn-report" id="reportBtn">📋 Timer Report</button>
+    </div>
+    <div id="recList"><div class="empty">No records yet.</div></div>
+    <button class="clr-btn" id="clrBtn">Clear all</button>
+  </div>
+</div>
+
+<!-- ── fullscreen card ── -->
+<div id="card">
+  <div class="card-icon" id="cardIcon">🟢</div>
+  <div class="card-word" id="cardWord">GREEN</div>
+  <div class="card-sub">Hold up to speaker • Tap to dismiss</div>
+</div>
+
+<!-- ── new meeting confirm modal ── -->
+<div id="newMtgModal" style="display:none;position:fixed;inset:0;z-index:1000;
+  background:rgba(0,0,0,.88);flex-direction:column;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:var(--surface);border-radius:var(--r);padding:24px;width:100%;max-width:360px;text-align:center;">
+    <div style="font-size:48px;margin-bottom:12px;">🔄</div>
+    <h2 style="margin-bottom:8px;">Start New Meeting?</h2>
+    <p style="color:var(--dim);font-size:14px;margin-bottom:20px;">This will clear all records and reset the current timer. Make sure you've copied the Timer Report first.</p>
+    <div style="display:flex;gap:10px;">
+      <button onclick="confirmNewMtg()" style="flex:1;padding:14px;border-radius:var(--r);border:none;font-size:15px;font-weight:600;background:#e74c3c;color:#fff;cursor:pointer;">Yes, Clear All</button>
+      <button onclick="document.getElementById('newMtgModal').style.display='none'" style="flex:1;padding:14px;border-radius:var(--r);border:none;font-size:15px;font-weight:600;background:#555;color:#fff;cursor:pointer;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── report modal ── -->
+<div id="modal">
+  <div class="modal-box">
+    <h2>📋 Timer Report</h2>
+    <div class="report-txt" id="reportTxt"></div>
+    <div class="modal-btns">
+      <button onclick="copyReport()" style="background:var(--blue);color:#fff;">📋 Copy</button>
+      <button onclick="closeModal()" style="background:#555;color:#fff;">✕ Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── segment definitions ──────────────────────────────────────────────────────
+// green/yellow/red/ring = elapsed seconds for each milestone
+// min/max = qualification window (0 = non-competitive, no DQ)
+const S = {
+  //                                          green  yellow   red   ring   min    max   comp
+  // ── Competitive (range speeches) ──────────────────────────────────────────────────────
+  TT:         {label:"Table Topics",           green:60,  yellow:90,  red:120, ring:150, min:60,  max:120, comp:true },
+  PS57:       {label:"Prepared Speech (5-7m)", green:300, yellow:360, red:420, ring:450, min:300, max:420, comp:true },
+  PS46:       {label:"Prepared Speech (4-6m)", green:240, yellow:300, red:360, ring:390, min:240, max:360, comp:true },
+  EVAL:       {label:"Evaluation",             green:120, yellow:150, red:180, ring:210, min:120, max:180, comp:true },
+  // ── GE Team Introductions (fixed target time → red = target) ────────────────────────
+  GE_INTRO:   {label:"Evaluation Intro",       green:40,  yellow:50,  red:60,  ring:90,  min:0,   max:60,  comp:false},
+  TIMER_INTRO:{label:"Timer Intro",            green:150, yellow:165, red:180, ring:210, min:0,   max:180, comp:false},
+  AH_INTRO:   {label:"Ah-Counter Intro",       green:150, yellow:165, red:180, ring:210, min:0,   max:180, comp:false},
+  GRAM_INTRO: {label:"Grammarian Intro",       green:150, yellow:165, red:180, ring:210, min:0,   max:180, comp:false},
+  // ── GE Team Reports ──────────────────────────────────────────────────────────────────
+  TIMER_REP:  {label:"Timer Report",           green:120, yellow:150, red:180, ring:210, min:0,   max:180, comp:false},
+  AH_REP:     {label:"Ah-Counter Report",      green:90,  yellow:105, red:120, ring:150, min:0,   max:120, comp:false},
+  GRAM_REP:   {label:"Grammarian Report",      green:150, yellow:165, red:180, ring:210, min:0,   max:180, comp:false},
+  GE_REP:     {label:"General Evaluation",     green:360, yellow:420, red:480, ring:510, min:0,   max:480, comp:false},
+  // ── Other ────────────────────────────────────────────────────────────────────────────
+  GUEST:      {label:"Guest Talk",             green:240, yellow:270, red:300, ring:330, min:0,   max:300, comp:false},
+  SHARE:      {label:"Sharing",               green:0,   yellow:0,   red:0,   ring:0,   min:0,   max:0,   comp:false},
+  CUSTOM:     {label:"Custom",                green:0,   yellow:0,   red:0,   ring:0,   min:0,   max:0,   comp:false},
+};
+
+// ── state ────────────────────────────────────────────────────────────────────
+let interval=null, secs=0, running=false, colorState='none';
+let records=loadRec(), wakeLock=null, audioCtx=null;
+let cardTimer=null;
+const $customRed = document.getElementById('customRed');
+
+const $seg     = document.getElementById('seg');
+const $speaker = document.getElementById('speaker');
+const $clock   = document.getElementById('clock');
+const $status  = document.getElementById('status');
+const $startBtn= document.getElementById('startBtn');
+const $pauseBtn= document.getElementById('pauseBtn');
+const $saveBtn = document.getElementById('saveBtn');
+const $resetBtn= document.getElementById('resetBtn');
+const $bellBtn = document.getElementById('bellBtn');
+const $recList = document.getElementById('recList');
+const $card    = document.getElementById('card');
+const $cardIcon= document.getElementById('cardIcon');
+const $cardWord= document.getElementById('cardWord');
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+function fmt(s){ return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); }
+
+function esc(str){
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+
+// ── audio (Web Audio API) ─────────────────────────────────────────────────────
+function getACtx(){ if(!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)(); return audioCtx; }
+function beep(freq,dur,vol=0.45){
+  try{
+    const c=getACtx(), o=c.createOscillator(), g=c.createGain();
+    o.connect(g); g.connect(c.destination);
+    o.type='sine'; o.frequency.value=freq;
+    g.gain.setValueAtTime(vol,c.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+dur);
+    o.start(); o.stop(c.currentTime+dur);
+  }catch(e){}
+}
+// 🟢 one rising beep
+function alertGreen(){  beep(880,0.6,0.95); }
+// 🟡 two mid beeps
+function alertYellow(){ beep(660,0.4,0.95); setTimeout(()=>beep(660,0.4,0.95),350); }
+// 🔴 three low beeps
+function alertRed(){    for(let i=0;i<3;i++) setTimeout(()=>beep(440,0.5,1.0),i*400); }
+// 🔔 five rapid beeps (ring bell)
+function alertRing(){   for(let i=0;i<5;i++) setTimeout(()=>beep(330,0.45,1.0),i*200); }
+
+// ── vibration ────────────────────────────────────────────────────────────────
+function vib(p){ try{ navigator.vibrate&&navigator.vibrate(p); }catch(e){} }
+
+// ── milestone display ─────────────────────────────────────────────────────────
+// Returns effective thresholds: applies customRed override, ring always = red + 30s
+function activeSeg(){
+  const base = S[$seg.value];
+  const customVal = parseFloat($customRed.value);
+  let {green, yellow, red, min, max} = base;
+
+  if(!isNaN(customVal) && customVal > 0){
+    const redSecs = Math.round(customVal * 60);
+    if(base.red > 0){
+      const ratio = redSecs / base.red;
+      green  = Math.round(base.green  * ratio);
+      yellow = Math.round(base.yellow * ratio);
+    } else {
+      green  = Math.round(redSecs * 0.70);
+      yellow = Math.round(redSecs * 0.85);
+    }
+    red = redSecs;
+    max = redSecs;
+  }
+  // rule: red < 5 min → fixed 30s intervals; red >= 5 min → fixed 1 min intervals
+  if(red > 0 && red < 300){
+    yellow = red - 30;
+    green  = Math.max(0, red - 60);
+  } else if(red >= 300){
+    yellow = red - 60;
+    green  = Math.max(0, red - 120);
+  }
+  // universal rule: ring = red + 30s no matter what
+  const ring = red ? red + 30 : 0;
+  return Object.assign({}, base, {green, yellow, red, ring, max});
+}
+function refreshMs(){
+  const seg = activeSeg();
+  document.getElementById('ms-g').textContent    = seg.green  ? `🟢 ${fmt(seg.green)}`  : '🟢 –';
+  document.getElementById('ms-y').textContent    = seg.yellow ? `🟡 ${fmt(seg.yellow)}` : '🟡 –';
+  document.getElementById('ms-r').textContent    = seg.red    ? `🔴 ${fmt(seg.red)}`    : '🔴 –';
+  document.getElementById('ms-ring').textContent = seg.ring   ? `🔔 ${fmt(seg.ring)}`   : '🔔 –';
+}
+$seg.addEventListener('change', ()=>{ $customRed.value=''; refreshMs(); });
+$customRed.addEventListener('input', refreshMs);
+refreshMs();
+
+// ── fullscreen card ───────────────────────────────────────────────────────────
+const CARD_CFG={
+  green: {icon:'🟢', word:'GREEN',  cls:'card-green' },
+  yellow:{icon:'🟡', word:'YELLOW', cls:'card-yellow'},
+  red:   {icon:'🔴', word:'RED',    cls:'card-red'   },
+  ring:  {icon:'🔔', word:'RING!',  cls:'card-ring'  },
+};
+function showCard(color){
+  const c=CARD_CFG[color];
+  $card.className=c.cls;
+  $cardIcon.textContent=c.icon;
+  $cardWord.textContent=c.word;
+  $card.style.display='flex';
+  clearTimeout(cardTimer);
+  cardTimer=setTimeout(()=>{ $card.style.display='none'; }, 4000); // auto-dismiss 4s
+}
+$card.addEventListener('click',()=>{ clearTimeout(cardTimer); $card.style.display='none'; });
+
+// ── color state machine ───────────────────────────────────────────────────────
+const STATUS_TEXT={
+  none:  'Ready',
+  green: '🟢 Minimum time reached',
+  yellow:'🟡 Approaching time limit',
+  red:   '🔴 Maximum time — please wrap up!',
+  ring:  '🔔 OVERTIME — Bell ring!',
+};
+function applyColor(state){
+  document.body.classList.remove('s-green','s-yellow','s-red','s-ring');
+  if(state!=='none') document.body.classList.add('s-'+state);
+  $status.textContent=STATUS_TEXT[state]||'';
+}
+
+function checkMilestones(){
+  const seg=activeSeg();
+  if(!seg.green) return;
+  let next='none';
+  if(secs>=seg.ring)   next='ring';
+  else if(secs>=seg.red)    next='red';
+  else if(secs>=seg.yellow) next='yellow';
+  else if(secs>=seg.green)  next='green';
+  if(next!==colorState){
+    colorState=next;
+    applyColor(next);
+    if(next==='green') { alertGreen();  vib([300]);                      showCard('green');  }
+    if(next==='yellow'){ alertYellow(); vib([200,100,200]);               showCard('yellow'); }
+    if(next==='red')   { alertRed();    vib([200,100,200,100,200]);        showCard('red');    }
+    if(next==='ring')  { alertRing();   vib([300,150,300,150,300,150,300]);showCard('ring');   }
+  }
+}
+
+// ── timer controls ────────────────────────────────────────────────────────────
+function tick(){ secs++; $clock.textContent=fmt(secs); checkMilestones(); }
+
+$startBtn.addEventListener('click',()=>{
+  try{ getACtx().resume(); }catch(e){}
+  running=true;
+  interval=setInterval(tick,1000);
+  $startBtn.style.display='none';
+  $pauseBtn.style.display='block';
+  $saveBtn.style.display='none';
+  $bellBtn.style.display='block';
+  $seg.disabled=true;
+  $status.textContent='Timing…';
+});
+
+$pauseBtn.addEventListener('click',()=>{
+  clearInterval(interval); running=false;
+  $pauseBtn.style.display='none';
+  $startBtn.style.display='block';
+  $startBtn.textContent='▶ RESUME';
+  $saveBtn.style.display='block';
+});
+
+$resetBtn.addEventListener('click',()=>{
+  clearInterval(interval); running=false; secs=0; colorState='none';
+  $clock.textContent='00:00';
+  applyColor('none');
+  $status.textContent='Select a segment and press START';
+  $startBtn.style.display='block'; $startBtn.textContent='▶ START';
+  $pauseBtn.style.display='none';
+  $saveBtn.style.display='none';
+  $bellBtn.style.display='none';
+  $seg.disabled=false;
+  $customRed.value='';
+  refreshMs();
+});
+
+$saveBtn.addEventListener('click',()=>{
+  const seg=activeSeg();
+  const speaker=$speaker.value.trim()||'(unnamed)';
+  let qual='noted';
+  const isCompOrCustom = seg.comp || (parseFloat($customRed.value) > 0);
+  if(isCompOrCustom){
+    if(seg.min && secs < seg.min)  qual='under';
+    else if(seg.ring && secs>seg.ring) qual='over'; // over = past the bell
+    else                           qual='ok';
+  }
+  records.push({seg:seg.label, speaker, secs, min:seg.min, max:seg.max, comp:seg.comp, qual, ts:Date.now()});
+  saveRec(); renderRec();
+  $resetBtn.click();
+  $speaker.value='';
+  $speaker.focus();
+});
+
+$bellBtn.addEventListener('click',()=>{ alertRing(); vib([300,150,300]); });
+
+// ── records ───────────────────────────────────────────────────────────────────
+function renderRec(){
+  if(!records.length){ $recList.innerHTML='<div class="empty">No records yet.</div>'; return; }
+  $recList.innerHTML=records.map((r,i)=>{
+    const tagCls={ok:'ok',over:'over',under:'under',noted:'noted'}[r.qual];
+    const tagTxt={ok:'✔ OK',over:'▲ Over',under:'▽ Under',noted:'— Noted'}[r.qual];
+    const range=(r.min&&r.max)?` <span style="color:var(--dim);font-size:11px;">${fmt(r.min)}-${fmt(r.max)}</span>`:'';
+    return `<div class="rec-item">
+      <div class="rec-left">
+        <strong>${esc(r.speaker)}</strong><br>
+        <span style="color:var(--dim);font-size:12px;">${esc(r.seg)}</span>${range}
+      </div>
+      <div class="rec-right">
+        <span style="font-variant-numeric:tabular-nums;font-weight:600;">${fmt(r.secs)}</span>
+        <span class="tag ${tagCls}">${tagTxt}</span>
+        <button class="del-btn" onclick="delRec(${i})">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function delRec(i){ records.splice(i,1); saveRec(); renderRec(); }
+document.getElementById('clrBtn').addEventListener('click',()=>{
+  if(confirm('Clear all records?')){ records=[]; saveRec(); renderRec(); }
+});
+document.getElementById('newMtgBtn').addEventListener('click',()=>{
+  document.getElementById('newMtgModal').style.display='flex';
+});
+function confirmNewMtg(){
+  document.getElementById('newMtgModal').style.display='none';
+  records=[]; saveRec(); renderRec();
+  $resetBtn.click();
+  $seg.value='TT';
+  $customRed.value='';
+  refreshMs();
+}
+
+// ── persistence ───────────────────────────────────────────────────────────────
+function saveRec(){ localStorage.setItem('tm_rec',JSON.stringify(records)); }
+function loadRec(){ try{ return JSON.parse(localStorage.getItem('tm_rec'))||[]; }catch(e){ return []; } }
+
+// ── timer report ──────────────────────────────────────────────────────────────
+function buildReport(){
+  const d=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+  let lines=[`🕒 TIMER REPORT  —  ${d}\n${'─'.repeat(42)}`];
+  const comp=records.filter(r=>r.comp), other=records.filter(r=>!r.comp);
+  if(comp.length){
+    lines.push('\n🏆 COMPETITIVE SPEECHES');
+    comp.forEach((r,i)=>{
+      const rng=`(${fmt(r.min)}-${fmt(r.max)})`;
+      const st=r.qual==='ok'?'✅ Qualified':r.qual==='over'?'❌ Over time':'⚠️ Under time';
+      lines.push(`  ${i+1}. ${r.speaker}  |  ${r.seg} ${rng}  |  ${fmt(r.secs)}  |  ${st}`);
+    });
+  }
+  if(other.length){
+    lines.push('\n📋 ROLE REPORTS & OTHERS');
+    other.forEach((r,i)=>{ lines.push(`  ${i+1}. ${r.speaker}  |  ${r.seg}  |  ${fmt(r.secs)}`); });
+  }
+  lines.push(`\n${'─'.repeat(42)}\nTotal ${records.length} record(s) this session.`);
+  return lines.join('\n');
+}
+document.getElementById('reportBtn').addEventListener('click',()=>{
+  document.getElementById('reportTxt').textContent=buildReport();
+  document.getElementById('modal').style.display='flex';
+});
+function copyReport(){
+  const txt=document.getElementById('reportTxt').textContent;
+  navigator.clipboard.writeText(txt)
+    .then(()=>alert('Copied! Paste to WeChat or anywhere you need.'))
+    .catch(()=>{
+      const el=document.getElementById('reportTxt');
+      const rng=document.createRange(); rng.selectNodeContents(el);
+      const sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(rng);
+      document.execCommand('copy');
+      alert('Report copied!');
+    });
+}
+function closeModal(){ document.getElementById('modal').style.display='none'; }
+
+// ── wake lock ─────────────────────────────────────────────────────────────────
+const $wakeBtn=document.getElementById('wakeBtn');
+$wakeBtn.addEventListener('click',async()=>{
+  if(wakeLock){
+    await wakeLock.release(); wakeLock=null;
+    $wakeBtn.textContent='💡 Keep Awake'; $wakeBtn.classList.remove('on');
+  } else {
+    try{
+      wakeLock=await navigator.wakeLock.request('screen');
+      $wakeBtn.textContent='💡 Awake: ON'; $wakeBtn.classList.add('on');
+      wakeLock.addEventListener('release',()=>{ wakeLock=null; $wakeBtn.textContent='💡 Keep Awake'; $wakeBtn.classList.remove('on'); });
+    }catch(e){ alert('Wake Lock is not supported in this browser.\nPlease disable auto-lock in your phone settings during meetings.'); }
+  }
+});
+// re-acquire after tab switch
+document.addEventListener('visibilitychange',async()=>{
+  if(wakeLock&&document.visibilityState==='visible'){
+    try{ wakeLock=await navigator.wakeLock.request('screen'); }catch(e){}
+  }
+});
+
+// ── WeChat / mobile audio unlock ──────────────────────────────────────────────
+(function(){
+  const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
+  // Re-resume AudioContext whenever page becomes visible (WeChat suspends it on bg)
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState==='visible' && audioCtx) try{ audioCtx.resume(); }catch(e){}
+  });
+  if(isWeChat){
+    // Unlock AudioContext on first touch (WeChat blocks audio until user gesture)
+    document.addEventListener('touchstart', function unlock(){
+      try{ getACtx().resume(); }catch(e){}
+      document.removeEventListener('touchstart', unlock);
+    }, {once:true, passive:true});
+    // One-time tip banner
+    const tip=document.createElement('div');
+    tip.style.cssText='position:fixed;bottom:70px;left:50%;transform:translateX(-50%);'+
+      'background:rgba(41,128,185,.92);color:#fff;padding:9px 16px;border-radius:22px;'+
+      'font-size:13px;z-index:999;white-space:nowrap;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.4);';
+    tip.innerHTML='📱 微信用户：按 <b>START</b> 即可激活声音 &nbsp;✕';
+    tip.onclick=()=>tip.remove();
+    document.body.appendChild(tip);
+    setTimeout(()=>{ if(tip.parentNode) tip.remove(); }, 7000);
+  }
+})();
+
+// ── init ──────────────────────────────────────────────────────────────────────
+renderRec();
+</script>
+</body>
+</html>
